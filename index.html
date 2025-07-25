@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Math 3D Plotter</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #111827;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    select option {
+      color: #d1d5db;
+      /* Tailwind's text-gray-300 */
+      background-color: #1f2937;
+      /* Tailwind's bg-gray-800 */
+    }
+
+    .tab-btn {
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      text-align: left;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .active-tab {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Nút mở mini form -->
+  <div class="fixed bottom-4 right-4 z-20 text-right">
+    <button onclick="toggleMiniForm()"
+      class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-full shadow-lg">
+      ⚙️ Cài Đặt
+    </button>
+
+    <!-- Mini form với tabs -->
+    <div id="miniForm"
+      class="hidden mt-3 p-4 bg-black/80 backdrop-blur-md rounded-2xl shadow-2xl w-[28rem] max-h-[70vh] overflow-y-auto text-white border border-white/10">
+      <script>
+        function toggleMiniForm() {
+          const form = document.getElementById('miniForm');
+          form.classList.toggle('hidden');
+        }
+      </script>
+      <!-- Flex chứa nội dung và nút tab dọc -->
+      <div class="flex space-x-4 text-left">
+
+        <!-- Nội dung tab bên trái -->
+        <div class="flex-1">
+          <!-- Tab: Hiển thị -->
+          <div id="tab-display" class="tab-content space-y-3">
+            <div class="flex flex-wrap gap-2 text-sm">
+              <button onclick="toggle(xAxis, yAxis, zAxis, originLabel, xLabel, yLabel, zLabel)"
+                class="border px-3 py-1 rounded">XYZ</button>
+              <button onclick="toggle(gridHelper)" class="border px-3 py-1 rounded">Lưới</button>
+              <hr class="w-px h-auto border-l border-l border-gray-300 mx-2" />
+
+              <select id="primitiveShape" class="border bg-transparent text-white rounded px-3 py-1 text-sm">
+                <option value="none">Chọn khối 2D/3D</option>
+                <option value="cube">Hình Lập Phương</option>
+                <option value="sphere">Hình Cầu</option>
+                <option value="cylinder">Hình Trụ</option>
+                <option value="cone">Hình Nón</option>
+                <option value="circle">Hình Tròn 2D</option>
+                <option value="ellipse">Ellipse</option>
+                <option value="triangle">Tam Giác 2D</option>
+                <option value="pentagon">Ngũ Giác 2D</option>
+                <option value="hexagon">Lục Giác 2D</option>
+                <option value="pyramid">Hình Chóp</option>
+                <option value="plane">Mặt Phẳng</option>
+              </select>
+              <button onclick="plotPrimitive()" class="border px-3 py-1 rounded">➕ Thêm</button>
+            </div>
+            <hr class="my-2 border-t border-dashed border-gray-300" />
+
+            <!-- HTML -->
+            <div id="buttonContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm"></div>
+
+            <script>
+              const objectButtons = [
+                { label: '⚪ Khối Cầu', ref: 'sphere' },
+                { label: '❤️ Trái Tim', ref: 'heart' },
+                { label: '🌀 Hình Xuyến', ref: 'torus' },
+                { label: '🔃 Xoắn Ốc', ref: 'spiral' },
+                { label: '🌊 Sóng Sin', ref: 'wave' },
+                { label: '🔺 Yên Ngựa', ref: 'saddle' },
+                { label: '🧊 Elipsoid', ref: 'ellipsoid' },
+                { label: '📈 Parabol 3D', ref: 'paraboloid' },
+                { label: '🌀 Sin-Cos Wave', ref: 'sincosWave' },
+                { label: '♾️ Mobius', ref: 'mobius' },
+                { label: '🔻 Cone', ref: 'cone' },
+                { label: '🌀 Cycloid', ref: 'cycloid' }
+              ];
+
+
+              const buttonContainer = document.getElementById('buttonContainer');
+
+              objectButtons.forEach(({ label, ref }) => {
+                const btn = document.createElement('button');
+                btn.textContent = label;
+                btn.className = 'border px-3 py-1 rounded';
+                btn.onclick = () => toggle(window[ref]); // Truy cập đối tượng toàn cục
+                buttonContainer.appendChild(btn);
+              });
+            </script>
+
+            <hr class="my-2 border-t border-dashed border-gray-300" />
+
+            <div class="text-sm text-gray-600">
+              <!-- Nội dung khác -->
+              <p>Thông tin bổ sung, ghi chú hoặc hướng dẫn ở đây.</p>
+            </div>
+          </div>
+
+          <!-- Tab: Góc Nhìn -->
+          <div id="tab-view" class="tab-content hidden">
+            <label class="text-sm font-semibold">Chọn góc nhìn:</label>
+            <select id="viewSelector" onchange="setViewDirection()"
+              class="border bg-transparent text-white rounded px-2 py-1 text-sm w-full mt-1">
+              <option value="default">3D Tự Do</option>
+              <option value="xy">XY (Trên)</option>
+              <option value="yz">YZ (Trái)</option>
+              <option value="xz">XZ (Trước)</option>
+            </select>
+          </div>
+
+          <!-- Tab: Ánh sáng -->
+          <div id="tab-light" class="tab-content hidden space-y-3">
+            <label class="text-sm font-semibold">Chế độ ánh sáng:</label>
+            <select id="lightMode" onchange="updateLightMode()"
+              class="border bg-transparent text-white rounded px-2 py-1 text-sm w-full">
+              <option value="soft">Mềm</option>
+              <option value="strong">Mạnh</option>
+              <option value="wireframe">Chỉ khung</option>
+            </select>
+
+            <!-- Material Picker -->
+            <label class="text-sm font-semibold">Loại vật liệu:</label>
+            <select id="materialType" onchange="updateLightMode()"
+              class="border bg-transparent text-white rounded px-2 py-1 text-sm w-full">
+              <option value="standard">Standard</option>
+              <option value="phong">Phong</option>
+              <option value="lambert">Lambert</option>
+              <option value="toon">Toon</option>
+              <option value="texture">Texture</option>
+            </select>
+
+            <!-- Texture Picker (chỉ hiện nếu chọn texture) -->
+            <label id="textureLabel" class="text-sm font-semibold hidden">Chọn ảnh nền:</label>
+            <input type="file" id="textureImage" accept="image/*" class="hidden w-full text-white"
+              onchange="updateLightMode()" />
+          </div>
+
+
+          <!-- Tab: Vector -->
+          <div id="tab-vector" class="tab-content hidden space-y-3">
+            <label class="text-sm font-semibold block">Vector:</label>
+            <div id="vector-inputs" class="grid grid-cols-3 gap-3 text-sm font-medium mt-2"></div>
+            <script>
+              const vectorInputs = [
+                { label: "X1", id: "x1" },
+                { label: "Y1", id: "y1" },
+                { label: "Z1", id: "z1" },
+                { label: "X2", id: "x2" },
+                { label: "Y2", id: "y2" },
+                { label: "Z2", id: "z2" },
+              ];
+
+              const container = document.getElementById("vector-inputs");
+
+              vectorInputs.forEach(({ label, id }) => {
+                const wrapper = document.createElement("label");
+                wrapper.className = "flex items-center space-x-1";
+
+                const span = document.createElement("span");
+                span.textContent = label + ":";
+
+                const input = document.createElement("input");
+                input.type = "number";
+                input.id = id;
+                input.step = "0.1";
+                input.className = "w-20 p-1 border rounded text-black";
+
+                wrapper.appendChild(span);
+                wrapper.appendChild(input);
+                container.appendChild(wrapper);
+              });
+            </script>
+            <button onclick="drawVectorFromInput()" class="border px-3 py-1 rounded">Vẽ vector</button>
+          </div>
+
+          <!-- Tab: Trục -->
+          <div id="tab-axis" class="tab-content hidden space-y-3">
+            <label class="text-sm font-semibold block">🎚️ Độ phân giải:</label>
+            <input id="resolution" type="range" min="5" max="50" value="25" class="w-full">
+
+            <div id="axis-inputs" class="grid grid-cols-2 gap-3 text-sm font-medium mt-2"></div>
+
+            <script>
+              const axisParams = [
+                { label: 'X min', id: 'xMin', value: -50 },
+                { label: 'X max', id: 'xMax', value: 50 },
+                { label: 'Y min', id: 'yMin', value: -50 },
+                { label: 'Y max', id: 'yMax', value: 50 }
+              ];
+
+              const axisInputsContainer = document.getElementById('axis-inputs');
+
+              axisParams.forEach(param => {
+                const label = document.createElement('label');
+                label.className = 'flex flex-col';
+
+                label.innerHTML = `
+                  ${param.label}
+                  <input id="${param.id}" type="number" value="${param.value}" class="text-black px-2 py-1 rounded-lg">
+                `;
+
+                axisInputsContainer.appendChild(label);
+              });
+            </script>
+          </div>
+
+          <div id="tab-history" class="tab-content hidden">
+            <label class="text-sm font-semibold block">🧾 Lịch Sử:</label>
+            <ul id="historyList" class="space-y-1 text-sm list-disc list-inside"></ul>
+          </div>
+          <!-- Tab: Xuất ảnh -->
+          <div id="tab-export" class="tab-content hidden">
+            <button onclick="saveImage()"
+              class="w-full bg-red-600 hover:bg-red-700 transition px-4 py-2 rounded-xl font-semibold mt-2">
+              📸 Xuất Ảnh
+            </button>
+          </div>
+        </div>
+
+        <!-- Nút tab dọc bên phải -->
+        <div class="flex flex-col border-l border-white/20 pl-2 space-y-2 text-sm font-semibold min-w-[7rem]">
+          <button class="tab-btn active-tab" onclick="switchTab(event, 'tab-display')">🎛️ Hiển Thị</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-view')">🧭 Góc Nhìn</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-light')">💡 Ánh Sáng</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-vector')">Vector</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-axis')">📐 Trục</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-history')">🧾 Lịch sử</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-export')">📸 Xuất</button>
+          <script>
+            function switchTab(evt, tabId) {
+              // Ẩn toàn bộ tab content
+              document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+
+              // Bỏ active-tab khỏi tất cả nút
+              document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
+
+              // Hiện tab được chọn
+              document.getElementById(tabId).classList.remove('hidden');
+
+              // Đánh dấu nút đang được chọn
+              evt.currentTarget.classList.add('active-tab');
+            }
+          </script>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Nút 3 gạch để bật menu -->
+  <button onclick="toggleMenu()" class="fixed top-4 right-4 z-40 p-2 bg-black/80 text-white rounded-md shadow-md">
+    <!-- Biểu tượng 3 gạch -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+
+  <!-- Floating Menu -->
+  <div id="floatingMenu"
+    class="hidden fixed top-4 right-20 translate-x-1/2 z-30 bg-black/80 text-white rounded-xl px-4 py-3 space-y-2 shadow-xl border border-white/10">
+    <script>
+      function toggleMenu() {
+        const menu = document.getElementById('floatingMenu');
+        menu.classList.toggle('hidden');
+      }
+      function toggleDiv(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.toggle('hidden');
+        }
+      }
+      const panels = [
+        { id: 'formulaPanel', label: '📐 Công Thức' }
+      ];
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const floatingMenu = document.getElementById('floatingMenu');
+        if (!floatingMenu) return;
+
+        panels.forEach(panel => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'flex items-center space-x-2';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = `toggle${panel.id.charAt(0).toUpperCase() + panel.id.slice(1)}`;
+          checkbox.onchange = () => toggleDiv(panel.id);
+
+          const label = document.createElement('label');
+          label.htmlFor = checkbox.id;
+          label.textContent = panel.label;
+
+          wrapper.appendChild(checkbox);
+          wrapper.appendChild(label);
+          floatingMenu.appendChild(wrapper);
+        });
+      });
+    </script>
+  </div>
+
+
+  <div id="formulaPanel"
+    class="hidden absolute top-[200px] left-4 bg-black/60 backdrop-blur-md p-5 rounded-2xl text-white space-y-4 z-10 w-80 max-h-[70vh] overflow-y-auto shadow-2xl border border-white/10">
+
+    <div class="space-y-2">
+      <label class="font-semibold">🧮 Công Thức z = f(x, y)</label>
+      <input id="inputFormula" type="text" class="w-full text-black px-3 py-2 rounded-lg"
+        placeholder="z = sin(x) + cos(y)">
+      <select id="mode" class="w-full text-black px-3 py-2 rounded-lg">
+        <option value="surface">Bề Mặt Mịn</option>
+        <option value="line">Dạng Line</option>
+      </select>
+      <button onclick="plotSurface()"
+        class="w-full bg-green-600 hover:bg-green-700 transition px-4 py-2 rounded-xl font-semibold">📊 Vẽ Đồ
+        Thị</button>
+    </div>
+
+    <div class="space-y-2">
+      <label class="font-semibold">📈 Công Thức r = f(θ)</label>
+      <input id="polarFormula" type="text" class="w-full text-black px-3 py-2 rounded-lg"
+        placeholder="r = 10 * sin(3 * theta)">
+      <button onclick="plotPolar()"
+        class="w-full bg-purple-600 hover:bg-purple-700 transition px-4 py-2 rounded-xl font-semibold">📉 Vẽ Đồ
+        Thị
+        Cực</button>
+    </div>
+
+    <div class="space-y-2">
+      <label class="font-semibold">🧮 Công Thức Tùy Chỉnh (x, y, z)</label>
+      <input id="customX" type="text" class="w-full text-black px-3 py-2 rounded-lg" placeholder="x = ...">
+      <input id="customY" type="text" class="w-full text-black px-3 py-2 rounded-lg" placeholder="y = ...">
+      <input id="customZ" type="text" class="w-full text-black px-3 py-2 rounded-lg" placeholder="z = ...">
+      <div class="grid grid-cols-3 gap-2 text-sm text-white font-medium">
+        <label class="flex flex-col">t min <input id="tMin" type="number" value="0"
+            class="w-full text-black px-2 py-1 rounded-lg"></label>
+        <label class="flex flex-col">t max <input id="tMax" type="number" value="6.28"
+            class="w-full text-black px-2 py-1 rounded-lg"></label>
+        <label class="flex flex-col">res <input id="tRes" type="number" value="200"
+            class="w-full text-black px-2 py-1 rounded-lg"></label>
+      </div>
+      <button onclick="plotCustom3D()"
+        class="w-full bg-yellow-500 hover:bg-yellow-600 transition px-4 py-2 rounded-xl font-semibold">🧪 Vẽ Hình
+        Tùy
+        Chỉnh</button>
+    </div>
+  </div>
+
+  
+
+  <script type="module" src="script.js"></script>
+
+</body>
+
+</html>
